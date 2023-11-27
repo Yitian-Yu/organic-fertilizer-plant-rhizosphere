@@ -1,0 +1,24 @@
+#World map with bubble
+
+library(ggplot2)
+library(ggmap)
+#library(sp)
+#library(maptools)
+#library(maps)
+#library(ggpubr)
+
+#create empty map
+datac <- read.delim('test.txt', row.names = 1, sep = '\t', stringsAsFactors = FALSE, check.names = FALSE,na.strings="na")
+abundance <- datac$SUM
+mpc<-NULL
+mapworld<-borders("world",colour = NA,fill="gray")
+
+#define attributes
+mpc<-ggplot()+mapworld+ylim(-90,90)+theme(panel.grid = element_blank(), panel.background = element_rect(color = 'black', fill = 'transparent'), legend.key = element_rect(fill = 'transparent'))
+mpc2<-mpc+geom_point(aes(x=datac$Longitude,y=datac$Latitude,size=abundance),alpha=0.8)+scale_size(range=c(1,15))
+
+#view
+mpc2
+
+#export map
+ggsave('SUM.pdf', mpc2, width = 12, height = 6)

@@ -1,0 +1,18 @@
+#Chao 1 and Shannon index
+
+#read data
+genus <- read.delim('test.txt', row.names = 1, sep = '\t', stringsAsFactors = FALSE, check.names = FALSE)
+genus <- t(genus)
+
+library(vegan)
+library(picante)
+
+#Chao 1
+richness <- rowSums(genus > 0)
+
+#Shannon
+shannon_index <- diversity(genus, index = 'shannon', base = exp(1))
+
+#export
+write.csv(richness, 'Chao 1.csv', quote = FALSE)
+write.csv(shannon_index, 'shannon.csv', quote = FALSE)

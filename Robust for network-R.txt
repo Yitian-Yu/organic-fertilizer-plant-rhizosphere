@@ -1,0 +1,48 @@
+#Robust
+
+#Induce R packages
+library(BiocManager)
+library(phyloseq)
+library(igraph)
+library(network)
+library(sna)
+library(tidyverse)
+library(ggClusterNet)
+library(Biostrings)
+library(tidyfst)
+library("pulsar")
+library(tidyverse)
+library(WGCNA)
+library(GO.db)
+
+#Import and merge data
+metadata = read.delim("Group.tsv",row.names = 1)
+otutab = read.delim("OTU_table.txt", row.names=1)
+taxonomy = read.table("Taxonomy.txt", row.names=1)
+ps = phyloseq(sample_data(metadata),otu_table(as.matrix(otutab), taxa_are_rows=TRUE),
+              tax_table(as.matrix(taxonomy))#,
+              # phy_tree(tree),
+              # refseq(rep)
+)
+
+#Calculating
+res = natural.con.microp (
+  ps = ps,
+  Top = 60,
+  r.threshold= 0.6,
+  p.threshold=0.05,
+  method = "spearman",
+  norm = F,
+  end = 50, # less than nodes number of network
+  start = 0,
+  con.method = "pulsar"
+)
+
+p = res[[1]]
+p
+dat  = res[[2]]
+
+#Export
+ggsave('Stability.pdf', p, width = 8, height = 6)
+write.table(as.matrix(dat), 'StabilityData.txt', sep = '\t', col.names = NA, quote = FALSE)
+

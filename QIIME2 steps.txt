@@ -1,0 +1,155 @@
+#QIIME 2 workflow
+
+
+#Create manifest file
+cd seq
+ls -R *.1.gz > manifest.tsv
+
+#Collating documents as below
+sample id	forward-absolute-filepath	reverse-absolute-filepath
+raw.split.CK1_1	$PWD/seq/raw.split.CK1_1.1.fq	$PWD/seq/raw.split.CK1_1.2.fq
+raw.split.CK1_2	$PWD/seq/raw.split.CK1_2.1.fq	$PWD/seq/raw.split.CK1_2.2.fq
+raw.split.CK1_3	$PWD/seq/raw.split.CK1_3.1.fq	$PWD/seq/raw.split.CK1_3.2.fq
+
+#Create metadata file
+touch metadata.tsv
+#open metadata file and add information (for example)：
+sample id	group	host	year	......
+raw.split.CK1_1	control	wheat	2021	......
+raw.split.CK1_2	control	wheat	2021	......
+raw.split.CK1_3	control	wheat	2021	......
+
+
+
+#Import data
+time qiime tools import \
+--type 'SampleData[PairedEndSequencesWithQuality]' \
+--input-path manifest.tsv \
+--output-path paired-end-demux.qza \
+--input-format PairedEndFastqManifestPhred33V2
+
+#Remove the joint and primer sequence
+qiime cutadapt trim-paired 
+--i-demultiplexed-sequences paired-end-demux.qza 
+--p-cores 8 --p-front-f CCTACGGGNGGCWG 
+--p-front-r GACTACHVGGGTATCTAATCCY  
+--o-trimmed-sequences trimmed-seqs.qza  
+--verbose
+
+#View data quality
+#Visualization
+qiime demux summarize \
+--i-data trimmed-seqs.qza \
+--o-visualization demux.qzv
+#View
+qiime tools view demux.qzv
+
+
+
+#Dada2: denoise, obtain representative sequence, table, and statistical data table
+--p-trim-left-f forward
+--p-trim-left-r reverse
+--p-trunc-len-f forward
+--p-trunc-len-r reverse
+
+qiime dada2 denoise-paired \
+--i-demultiplexed-seqs paired-end-demux.qza \
+--p-trim-left-f 0 \
+--p-trim-left-r 0 \
+--p-trunc-len-f 240 \
+--p-trunc-len-r 200 \
+--p-n-threads 20 \
+--o-table table.qza \
+--o-representative-sequences rep-seqs.qza \
+--o-denoising-stats stats.qza
+
+
+
+#View dada2 denoise results
+#Visualization
+qiime metadata tabulate \
+  --m-input-file stats.qza \
+  --o-visualization stats.qzv
+#View
+qiime tools view stats.qzv
+
+
+
+#Species annotation
+#Import representative sequence
+qiime tools import \
+--type 'FeatureData[Sequence]' \
+--input-path 85_otus.fasta \
+--output-path ~/db/silva138.qza
+#Import species taxonomic information table
+qiime tools import \
+--type 'FeatureData[Taxonomy]' \
+--input-format HeaderlessTSVTaxonomyFormat \
+--input-path ~/db/silva138-99-tax.txt \
+--output-path ~/db/silva138-taxonomy.qza
+#Primers for sequencing
+qiime feature-classifier extract-reads \
+--i-sequences ~/db/silva-138-99-seqs.qza \
+--p-f-primer GTGCCAGCMGCCGCGGTAA \
+--p-r-primer GGACTACHVGGGTWTCTAAT \
+--o-reads ~/db/ref-seqs515/806.qza
+#Generate a specific classifier
+qiime feature-classifier fit-classifier-naive-bayes \
+--i-reference-reads ~/db/ref-seqs515/806.qza \
+--i-reference-taxonomy ~/db/silva-138-99-tax.qza \
+--o-classifier classifier-silva515/806.qza
+
+#Annotation
+time qiime feature-classifier classify-sklearn \
+ --i-classifier ~/db/silva-138-99-nb-classifier.qza \
+ --i-reads rep-seqs.qza \
+ --o-classification silvataxonomy.qza
+
+
+
+#Fliter sequence
+#Remove sequences annotated to mitochondria and chloroplasts or that could not be classified at the kingdom level
+qiime taxa filter-table \
+  --i-table table.qza \
+  --i-taxonomy merged_silvataxonomy.qza \
+  --p-include p__ \
+  --p-exclude mitochondria,chloroplast \
+  --o-filtered-table table-with-phyla-no-mitochondria-no-chloroplast.qza
+#Remove ASVs with low total sequence number
+#Fliter rare reads (total sequence number < 10)
+time qiime feature-table filter-features \
+ --i-table table-with-phyla-no-mitochondria-no-chloroplast.qza \
+ --p-min-frequency 10 \
+ --o-filtered-table frequency-filtered-table.qza
+#Normalized
+time qiime feature-table rarefy \
+--i-table frequency-filtered-table.qza \
+--p-sampling-depth 20000 \
+--o-rarefied-table table-filtered.qza
+
+
+
+#Visualization
+--i-table
+--i-taxonomy
+
+qiime taxa barplot \
+--i-table table-filtered.qza \
+--i-taxonomy silvataxonomy.qza\
+--m-metadata-file metadata.tsv \
+--o-visualization taxa-bar-plots.qzv
+
+#View
+qiime tools view taxa-bar-plots.qzv
+
+
+
+#Import ASV table
+--input-path
+time qiime tools export \
+--input-path table-filtered.qza \
+--output-path exported-feature-table
+#Turn biom to tsv format
+biom convert -i exported-feature-table/feature-table.biom \
+-o exported-feature-table/feature-table.txt \
+--to-tsv

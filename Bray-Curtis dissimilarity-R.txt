@@ -1,0 +1,10 @@
+#Bray-Curtis dissimilarity
+
+library(vegan)
+
+otu <- read.delim('species.txt', row.names = 1, sep = '\t', stringsAsFactors = FALSE, check.names = FALSE)
+otu <- data.frame(t(otu))
+bray_dis <- vegdist(otu, method = 'bray') 
+
+#export
+write.table(as.matrix(bray_dis), 'dsidance.txt', sep = '\t', col.names = NA, quote = FALSE)

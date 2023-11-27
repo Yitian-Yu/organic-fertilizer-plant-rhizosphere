@@ -1,0 +1,13 @@
+#Correlation analysis for network
+
+library(psych)
+
+# reading data
+data=read.table("ndfotu.txt", head=T, row.names=1)
+# Calculating the correlated index matrix between OTU
+occor = corr.test(data,use="pairwise",method="spearman",adjust="fdr",alpha=0.05)
+occor.r = occor$r
+occor.p = occor$p
+occor.r[occor.p<0.05|abs(occor.r)>0.8] = 0
+#save file
+write.csv(occor.r,file="ndfotu相关性.csv")

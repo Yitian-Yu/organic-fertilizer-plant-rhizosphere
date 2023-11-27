@@ -1,0 +1,47 @@
+#Principal coordinates analysis (PCoA)
+
+#OTU abundance file
+otu <- read.delim('otu.txt', row.names = 1, sep = '\t', stringsAsFactors = FALSE, check.names = FALSE)
+otu <- data.frame(t(otu))
+#Sample groups
+group <- read.delim('otugroup.txt', sep = '\t', stringsAsFactors = FALSE)
+
+library(vegan)
+
+#Ranking（based on OTU abundance file）
+distance <- vegdist(otu, method = 'bray')
+pcoa <- cmdscale(distance, k = (nrow(otu) - 1), eig = TRUE)
+
+#Extract axis interpretation（the first two axes）
+pcoa_eig <- (pcoa$eig)[1:2] / sum(pcoa$eig)
+
+#Extract the coordinates of the sample points
+sample_site <- data.frame({pcoa$point})[1:2]
+sample_site$names <- rownames(sample_site)
+names(sample_site)[1:2] <- c('PCoA1', 'PCoA2')
+
+#Adds grouping information for the coordinates of sample points
+sample_site <- merge(sample_site, group,by ='names', all.x = TRUE)
+
+library(ggplot2)
+
+pcoa_plot <- ggplot(sample_site, aes(PCoA1, PCoA2, group = genotype)) +
+  theme(panel.grid = element_blank(), panel.background = element_rect(color = 'black', fill = 'transparent'), legend.key = element_rect(fill = 'transparent')) +
+  geom_vline(xintercept = 0, color = 'gray', size = 0.3) +
+  geom_hline(yintercept = 0, color = 'gray', size = 0.3) +
+  geom_point(aes(color =genotype, shape =genotype), size = 3, alpha = 0.8) +
+  scale_shape_manual(values = c(17,19,15)) +
+  scale_color_manual(values = c('red', 'blue','green')) +
+  labs(x = paste('PCoA axis1: ', round(100 * pcoa_eig[1], 2), '%'), y = paste('PCoA axis2: ', round(100 * pcoa_eig[2], 2), '%')) 
+#view
+pcoa_plot
+
+#export
+ggsave('SpeciesR21.pdf', pcoa_plot, width = 6, height = 5)
+write.table(distance, 'dsidance.txt', sep = '\t', col.names = NA, quote = FALSE)
+
+
+#Anosim analysis
+adonis_result_otu <- anosim(otu, group$genotype, permutations = 999, distance = 'bray')  #这边方法与上面pcoa一样，用的BC
+#view
+adonis_result_otu
